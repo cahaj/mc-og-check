@@ -28,7 +28,7 @@ def getq():
     return q
 
 
-def retry(type, i):
+def retry(i, type="gapple"):
     if type == "mojang":
         url = URL
     elif type == "gapple":
@@ -52,7 +52,7 @@ def retry(type, i):
             else:
                 break
 
-def get(i, type="mojang"):
+def get(i, type="gapple"):
     if type == "mojang":
         url = URL
     elif type == "gapple":
@@ -64,6 +64,17 @@ def get(i, type="mojang"):
         r = requests.get(f"{url}{i}", headers={"Content-Type": "application/json"}, verify=cert)
         if r.status_code == 204:
             print(f"[{datetime.datetime.now()}] => {i}")
+            with open("data.json", "r") as f:
+                json_object = json.load(f)
+                keys = []
+                for item in json_object:
+                    key, value = list(item.items())[0]
+                    keys.append(key)
+                print(keys)
+                if i not in keys:
+                    data = json_object.append({i: {"datetime": str(datetime.datetime.now()), "unix": int(datetime.datetime.timestamp(datetime.datetime.now()))}})
+                    with open("data.json", "w") as f:
+                        json.dump(json_object, f, indent=3)
         elif r.status_code == 429:
             print("429")
             time.sleep(5)
@@ -78,7 +89,6 @@ def get(i, type="mojang"):
         print(f"EXCEPTION: {e}")
 
 
-q = getq()
 def main(queue: queue.Queue, type: str = "gapple"):
     while not queue.empty():
         i = queue.get()
@@ -89,8 +99,14 @@ if __name__ == '__main__':
     while True:
         q = getq()
         threads = []
-        for _ in range(5):
+        for _ in range(3):
             thread = threading.Thread(target=main, args=(q, "gapple"))
+            time.sleep(3)
+            thread.start()
+            threads.append(thread)
+        for _ in range(2):
+            thread = threading.Thread(target=main, args=(q, "mojang"))
+            time.sleep(3)
             thread.start()
             threads.append(thread)
         for i in threads:
