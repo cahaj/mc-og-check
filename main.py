@@ -1,15 +1,17 @@
 import requests
 import json
-import discord
-from discord import Webhook
-import aiohttp
-import asyncio
 import datetime
 import time
 import queue
 import threading
-import random
 import certifi
+
+from webserver import keep_alive
+
+def createkey():
+    from uuid import uuid4
+    key = uuid4()
+    return key
 
 cert = certifi.where()
 
@@ -96,6 +98,7 @@ def main(queue: queue.Queue, type: str = "gapple"):
 
 
 if __name__ == '__main__':
+    keep_alive()
     while True:
         q = getq()
         threads = []
