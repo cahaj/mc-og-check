@@ -16,23 +16,17 @@ cert = certifi.where()
 URL = "https://api.mojang.com/users/profiles/minecraft/"
 URLG = "https://api.gapple.pw/cors/username/"
 
-with open("oglist/oglist.json", "r", encoding="utf-8") as f:
-    oglist = json.load(f)
-    oglist = [x.lower() for x in oglist]
-q = queue.Queue()
-for i in oglist:
-    q.put(i)
+class Cycled(Exception): pass
 
-def getq(letter:str):
-    with open(f"oglist/oglist_{letter}.json", "r", encoding="utf-8") as f:
+def getq():
+    with open("snipelist.json", "r", encoding="utf-8") as f:
         oglist = json.load(f)
+        oglist = [x.lower() for x in oglist]
     q = queue.Queue()
     for i in oglist:
         q.put(i)
     return q
 
-with open("valid_proxies.json", "r", encoding="utf-8") as f:
-    proxies = json.load(f)
 
 def retry(type, i):
     if type == "mojang":
@@ -84,21 +78,22 @@ def get(i, type="mojang"):
         print(f"EXCEPTION: {e}")
 
 
-def main(queue=None, type="mojang"):
-    if queue != None:
-        while not queue.empty():
-            i = queue.get()
-            get(i=i, type=type)  
-
-    else:
-        global q
-        while not q.empty():
-            i = q.get()
-            get(i=i, type=type)   
-    
+q = getq()
+def main(queue: queue.Queue, type: str = "gapple"):
+    while not queue.empty():
+        i = queue.get()
+        get(i=i, type=type)
 
 
 if __name__ == '__main__':
-    for _ in range(10):
-        threading.Thread(target=main, args=(None, "gapple")).start()
-        time.sleep(4)
+    while True:
+        q = getq()
+        threads = []
+        for _ in range(5):
+            thread = threading.Thread(target=main, args=(q, "gapple"))
+            thread.start()
+            threads.append(thread)
+        for i in threads:
+            i.join()
+        print("CYCLED")
+
