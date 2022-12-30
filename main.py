@@ -14,56 +14,91 @@ import certifi
 cert = certifi.where()
 
 URL = "https://api.mojang.com/users/profiles/minecraft/"
-with open("oglist.json", "r", encoding="utf-8") as f:
+URLG = "https://api.gapple.pw/cors/username/"
+
+with open("oglist/oglist.json", "r", encoding="utf-8") as f:
     oglist = json.load(f)
     oglist = [x.lower() for x in oglist]
 q = queue.Queue()
 for i in oglist:
     q.put(i)
 
+def getq(letter:str):
+    with open(f"oglist/oglist_{letter}.json", "r", encoding="utf-8") as f:
+        oglist = json.load(f)
+    q = queue.Queue()
+    for i in oglist:
+        q.put(i)
+    return q
+
 with open("valid_proxies.json", "r", encoding="utf-8") as f:
     proxies = json.load(f)
 
+def retry(type, i):
+    if type == "mojang":
+        url = URL
+    elif type == "gapple":
+        url = URLG
+    else:
+        raise ValueError("`type` must be either `mojang` or `gapple`")
 
-async def send(letter:str = "All"):
-    if letter != "All":
-        with open(f"oglist_{letter}.json", "r", encoding="utf-8") as f:
-            oglist = json.load(f)
-    async with aiohttp.ClientSession() as session:
-        webhook = Webhook.from_url('WEBHOOK', session=session)
-        global q
-        count = 1
-        proxy = proxies[count]
-        await webhook.send(f"**{letter}** -> Started cycle, using proxy: `{proxy}`")
-        for i in oglist:
-                try:            
-                    r = requests.get(f"{URL}{i}", headers={"Content-Type": "application/json"}, proxies={"http": proxy, "https": proxy}, verify=cert)
-                    if r.status_code == 204:
-                        await webhook.send(f"> :star2: [{datetime.datetime.now()}] => `{i}`")
-                    elif r.status_code == 429:
-                        count = count + 1
-                        proxy = proxies[count]
-                        await webhook.send(f"> :exclamation: GOT 429, CHANGED PROXY TO `{proxy}`")
-                        await webhook.send(f"> SKIPPING `{i}`")
-                    elif r.status_code == 200:
-                        data = r.json()
-                        print(data)
-                        if "error" in data:
-                            await webhook.send(data)
-                            count = count + 1
-                            proxy = proxies[count]
-                            await webhook.send(f"> :exclamation: GOT AN ERROR, CHANGED PROXY TO `{proxy}`")
-                            await webhook.send(f"> SKIPPING `{i}`")
-                except Exception as e:
-                    await webhook.send(f"EXCEPTION: ||`{e}`||")
-                    count = count + 1
-                    proxy = proxies[count]
-                    await webhook.send(f"> :exclamation: GOT AN EXCEPTION, CHANGED PROXY TO `{proxy}`")
-                    await webhook.send(f"> SKIPPING `{i}`")
-
-async def main():
     while True:
-        await send("a")      
+        r = requests.get(f"{url}{i}", headers={"Content-Type": "application/json"}, verify=cert)
+        if r.status_code == 204:
+            print(f"[{datetime.datetime.now()}] => {i}")
+            break
+        elif r.status_code == 429:
+            print("429")
+            time.sleep(5)
+        elif r.status_code == 200:
+            data = r.json()
+            print(data)
+            if "error" in data:
+                time.sleep(5)
+            else:
+                break
+
+def get(i, type="mojang"):
+    if type == "mojang":
+        url = URL
+    elif type == "gapple":
+        url = URLG
+    else:
+        raise ValueError("`type` must be either `mojang` or `gapple`")
+    
+    try:
+        r = requests.get(f"{url}{i}", headers={"Content-Type": "application/json"}, verify=cert)
+        if r.status_code == 204:
+            print(f"[{datetime.datetime.now()}] => {i}")
+        elif r.status_code == 429:
+            print("429")
+            time.sleep(5)
+            retry(type=type, i=i)
+        elif r.status_code == 200:
+            data = r.json()
+            print(data)
+            if "error" in data:
+                time.sleep(2)
+                retry(type=type, i=i)
+    except Exception as e:
+        print(f"EXCEPTION: {e}")
+
+
+def main(queue=None, type="mojang"):
+    if queue != None:
+        while not queue.empty():
+            i = queue.get()
+            get(i=i, type=type)  
+
+    else:
+        global q
+        while not q.empty():
+            i = q.get()
+            get(i=i, type=type)   
+    
+
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    for _ in range(10):
+        threading.Thread(target=main, args=(None, "gapple")).start()
+        time.sleep(4)
