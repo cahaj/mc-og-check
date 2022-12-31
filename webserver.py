@@ -18,13 +18,16 @@ def home():
 def data():
     key = request.args.get('key')
     r = requests.get(f"{URL}?key={key}")
-    data = r.json()
-    if "error" not in data:
-        with open("data.json", "r") as f:
-            data = json.load(f)
-        return data
+    if r.status_code == 200:
+        data = r.json()
+        if "error" not in data:
+            with open("data.json", "r") as f:
+                data = json.load(f)
+            return data
+        else:
+            return {"error": "InvalidKey", "errorMessage": "Invalid key"}
     else:
-        return {"error": "InvalidKey"}
+        return {"error": f"Core{r.status_code}", "errorMessage": f"Core server returned {r.status_code}"}
 
 def run():
   app.run(host='0.0.0.0',port=6363)
